@@ -15,11 +15,9 @@ canvas { display:block; }
 <div id="info">Shift Lock: <span id="shiftStatus">OFF</span></div>
 <input type="text" id="chatInput" placeholder="Type message...">
 
-<!-- Three.js -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
-
 <script>
-// --- Scene Setup ---
+// ---------------- Scene ----------------
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x88c0f2);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -36,25 +34,19 @@ light.position.set(10,20,10); scene.add(light);
 const base = new THREE.Mesh(new THREE.BoxGeometry(50,1,50), new THREE.MeshPhongMaterial({color:0x2ecc71}));
 base.position.y=0; scene.add(base);
 
-// --- Player Noob ---
+// ---------------- Player ----------------
 const player = new THREE.Group();
-const head = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshPhongMaterial({color:0xffcc00}));
-head.position.y=2.5; player.add(head);
-const torso = new THREE.Mesh(new THREE.BoxGeometry(1,1.5,0.5), new THREE.MeshPhongMaterial({color:0x0000ff}));
-torso.position.y=1.25; player.add(torso);
-const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5,1,0.5), new THREE.MeshPhongMaterial({color:0x00ff00}));
-leftLeg.position.set(-0.25,0.5,0);
-const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5,1,0.5), new THREE.MeshPhongMaterial({color:0x00ff00}));
-rightLeg.position.set(0.25,0.5,0);
+const head = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshPhongMaterial({color:0xffcc00})); head.position.y=2.5; player.add(head);
+const torso = new THREE.Mesh(new THREE.BoxGeometry(1,1.5,0.5), new THREE.MeshPhongMaterial({color:0x0000ff})); torso.position.y=1.25; player.add(torso);
+const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5,1,0.5), new THREE.MeshPhongMaterial({color:0x00ff00})); leftLeg.position.set(-0.25,0.5,0);
+const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5,1,0.5), new THREE.MeshPhongMaterial({color:0x00ff00})); rightLeg.position.set(0.25,0.5,0);
 player.add(leftLeg); player.add(rightLeg);
-const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.3,1.2,0.3), new THREE.MeshPhongMaterial({color:0xffcc00}));
-leftArm.position.set(-0.65,1.7,0);
-const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.3,1.2,0.3), new THREE.MeshPhongMaterial({color:0xffcc00}));
-rightArm.position.set(0.65,1.7,0);
+const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.3,1.2,0.3), new THREE.MeshPhongMaterial({color:0xffcc00})); leftArm.position.set(-0.65,1.7,0);
+const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.3,1.2,0.3), new THREE.MeshPhongMaterial({color:0xffcc00})); rightArm.position.set(0.65,1.7,0);
 player.add(leftArm); player.add(rightArm);
 player.position.set(0,1.5,0); scene.add(player);
 
-// --- Variables ---
+// ---------------- Variables ----------------
 let velocity = new THREE.Vector3();
 let canJump=false; 
 let shiftLock=false;
@@ -67,7 +59,7 @@ let chatMessages=[];
 let currentEmote=null;
 let chatOpen=false;
 
-// --- Camera Control ---
+// ---------------- Camera ----------------
 document.addEventListener("mousedown", e=>{if(e.button===2) mouseDown=true;});
 document.addEventListener("mouseup", e=>{if(e.button===2) mouseDown=false;});
 document.addEventListener("mousemove", e=>{
@@ -78,7 +70,7 @@ document.addEventListener("mousemove", e=>{
     }
 });
 
-// --- Keyboard & Chat ---
+// ---------------- Keyboard & Chat ----------------
 const chatInput = document.getElementById("chatInput");
 document.addEventListener("keydown", async e=>{
     if(chatOpen){
@@ -86,7 +78,7 @@ document.addEventListener("keydown", async e=>{
             const text = chatInput.value.trim();
             if(text!==""){
                 addChatMessage("You: "+text);
-                playerChatAIResponse(text); // NPC responds via API
+                playerChatAIResponse(text);
             }
             chatInput.value=""; chatInput.style.display="none"; chatOpen=false;
         }
@@ -109,7 +101,7 @@ document.addEventListener("keyup", e=>{
     if(e.key.toLowerCase()==="d") move.right=0;
 });
 
-// --- Chat Functions ---
+// ---------------- Chat Functions ----------------
 function addChatMessage(text){
     const div = document.createElement("div");
     div.style.position="absolute";
@@ -128,7 +120,7 @@ function updateChat(){
     });
 }
 
-// --- Emotes ---
+// ---------------- Emotes ----------------
 document.addEventListener("keydown", e=>{
     if(chatOpen) return;
     if(e.key==="1") currentEmote="wave";
@@ -157,31 +149,25 @@ function updateEmotes(){
     }
 }
 
-// --- NPC Setup ---
+// ---------------- NPC Setup ----------------
 const npcCount = 3;
 const npcs = [];
 for(let i=0;i<npcCount;i++){
     const npc = new THREE.Group();
-    const head = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshPhongMaterial({color:0xffcc00}));
-    head.position.y=2.5; npc.add(head);
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(1,1.5,0.5), new THREE.MeshPhongMaterial({color:0x0000ff}));
-    torso.position.y=1.25; npc.add(torso);
-    const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5,1,0.5), new THREE.MeshPhongMaterial({color:0x00ff00}));
-    leftLeg.position.set(-0.25,0.5,0);
-    const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5,1,0.5), new THREE.MeshPhongMaterial({color:0x00ff00}));
-    rightLeg.position.set(0.25,0.5,0);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshPhongMaterial({color:0xffcc00})); head.position.y=2.5; npc.add(head);
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(1,1.5,0.5), new THREE.MeshPhongMaterial({color:0x0000ff})); torso.position.y=1.25; npc.add(torso);
+    const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5,1,0.5), new THREE.MeshPhongMaterial({color:0x00ff00})); leftLeg.position.set(-0.25,0.5,0);
+    const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5,1,0.5), new THREE.MeshPhongMaterial({color:0x00ff00})); rightLeg.position.set(0.25,0.5,0);
     npc.add(leftLeg); npc.add(rightLeg);
-    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.3,1.2,0.3), new THREE.MeshPhongMaterial({color:0xffcc00}));
-    leftArm.position.set(-0.65,1.7,0);
-    const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.3,1.2,0.3), new THREE.MeshPhongMaterial({color:0xffcc00}));
-    rightArm.position.set(0.65,1.7,0);
+    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.3,1.2,0.3), new THREE.MeshPhongMaterial({color:0xffcc00})); leftArm.position.set(-0.65,1.7,0);
+    const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.3,1.2,0.3), new THREE.MeshPhongMaterial({color:0xffcc00})); rightArm.position.set(0.65,1.7,0);
     npc.add(leftArm); npc.add(rightArm);
     npc.position.set(Math.random()*20-10,1.5,Math.random()*20-10);
     scene.add(npc);
     npcs.push({group:npc, direction:new THREE.Vector3(Math.random()-0.5,0,Math.random()-0.5).normalize(), chatTimer:0});
 }
 
-// --- NPC Movement ---
+// ---------------- NPC Movement ----------------
 function updateNPCs(){
     npcs.forEach(npc=>{
         npc.group.position.addScaledVector(npc.direction,0.02);
@@ -190,13 +176,11 @@ function updateNPCs(){
     });
 }
 
-// --- NPC Talk Function ---
+// ---------------- NPC Chat ----------------
 function npcTalk(npc, phrase){
     addChatMessage("Noob: "+phrase);
     npc.chatTimer = 200;
 }
-
-// --- Helper: Closest NPC ---
 function getClosestNPC(){
     let closest=null, minDist=Infinity;
     npcs.forEach(npc=>{
@@ -206,29 +190,16 @@ function getClosestNPC(){
     return closest;
 }
 
-// --- AI API Call ---
+// ---------------- AI Responses ----------------
+const fallbackReplies = [
+"lol ok","I dunno...","hmm interesting","really?","haha!","what?","sure!","omg","yes","no way","bruh","ok then","that’s crazy","cool","yep","maybe","wait what?","what do you mean?","nice","oh","wow","interesting","ikr","lmao","haha lol","sure sure","alright","uh huh","got it","yup","oof","nope","indeed","wowow","whoa","okok","ohhh","ahah","yeah yeah","aye","nah","ahh","hahaha","hehehe","wtf","omg omg","uhh","huh","hmmm","gotcha","ayyyy","bruh moment","lolol","yea","mhmm","aha","gotcha gotcha","okie","okie dokie","yep yep","nooo","yesss","yo","yooo","hmm hmm","mhmm mhmm","yea yea","hahaha lol","lol yeah"
+];
+
 async function npcAIResponseAPI(playerText){
-    try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-            method:"POST",
-            headers:{
-                "Content-Type":"application/json",
-                "Authorization":"Bearer YOUR_API_KEY" // <- Replace
-            },
-            body: JSON.stringify({
-                model:"gpt-3.5-turbo",
-                messages:[{role:"user", content:playerText}],
-                max_tokens:20
-            })
-        });
-        const data = await response.json();
-        return data.choices[0].message.content.trim();
-    } catch(e){
-        return "Error generating response.";
-    }
+    // Replace with backend API call for OpenAI if possible
+    return fallbackReplies[Math.floor(Math.random()*fallbackReplies.length)];
 }
 
-// --- Player chat triggers AI ---
 async function playerChatAIResponse(text){
     const npc = getClosestNPC();
     if(npc && npc.chatTimer===0){
@@ -237,11 +208,11 @@ async function playerChatAIResponse(text){
     }
 }
 
-// --- Animate ---
+// ---------------- Animate ----------------
 function animate(){
     requestAnimationFrame(animate);
 
-    // Movement
+    // Player movement
     let dir = new THREE.Vector3(move.right-move.left,0,move.backward-move.forward);
     if(dir.length()>0) dir.normalize();
     let moveVec = new THREE.Vector3();
@@ -256,7 +227,7 @@ function animate(){
         player.rotation.y = Math.atan2(moveVec.x, moveVec.z);
     }
 
-    // Arm & leg animation
+    // Arm & leg swing
     if(move.forward||move.backward){
         armSwingAngle+=0.1;
         leftArm.rotation.x=Math.sin(armSwingAngle)*0.5;
@@ -265,7 +236,7 @@ function animate(){
         rightLeg.rotation.x=Math.sin(armSwingAngle)*0.5;
     } else { leftArm.rotation.x*=0.9; rightArm.rotation.x*=0.9; leftLeg.rotation.x*=0.9; rightLeg.rotation.x*=0.9; }
 
-    // Gravity & floor
+    // Gravity
     velocity.y -= gravity; let nextY = player.position.y + velocity.y;
     if(nextY<1.5){ nextY=1.5; velocity.y=0; canJump=true; }
     player.position.y = nextY;

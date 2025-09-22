@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Noob Baseplate with AI NPCs</title>
+<title>Noob Baseplate with AI NPCs + Shooting</title>
 <style>
 body { margin:0; overflow:hidden; background:#88c0f2; }
 canvas { display:block; }
@@ -17,7 +17,7 @@ canvas { display:block; }
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
 <script>
-// ---------------- Scene ----------------
+// ---------------- Scene Setup ----------------
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x88c0f2);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -34,7 +34,7 @@ light.position.set(10,20,10); scene.add(light);
 const base = new THREE.Mesh(new THREE.BoxGeometry(50,1,50), new THREE.MeshPhongMaterial({color:0x2ecc71}));
 base.position.y=0; scene.add(base);
 
-// ---------------- Player ----------------
+// ---------------- Player Noob ----------------
 const player = new THREE.Group();
 const head = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshPhongMaterial({color:0xffcc00})); head.position.y=2.5; player.add(head);
 const torso = new THREE.Mesh(new THREE.BoxGeometry(1,1.5,0.5), new THREE.MeshPhongMaterial({color:0x0000ff})); torso.position.y=1.25; player.add(torso);
@@ -59,8 +59,15 @@ let chatMessages=[];
 let currentEmote=null;
 let chatOpen=false;
 
-// ---------------- Camera ----------------
-document.addEventListener("mousedown", e=>{if(e.button===2) mouseDown=true;});
+// ---------------- Bullets ----------------
+let bullets = [];
+const bulletSpeed = 0.5;
+
+// ---------------- Camera Control ----------------
+document.addEventListener("mousedown", e=>{
+    if(e.button===2) mouseDown=true;
+    if(e.button===0) shootBullet(); // left click shoots
+});
 document.addEventListener("mouseup", e=>{if(e.button===2) mouseDown=false;});
 document.addEventListener("mousemove", e=>{
     if(mouseDown && !chatOpen){
@@ -159,20 +166,56 @@ for(let i=0;i<npcCount;i++){
     const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5,1,0.5), new THREE.MeshPhongMaterial({color:0x00ff00})); leftLeg.position.set(-0.25,0.5,0);
     const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5,1,0.5), new THREE.MeshPhongMaterial({color:0x00ff00})); rightLeg.position.set(0.25,0.5,0);
     npc.add(leftLeg); npc.add(rightLeg);
-    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.3,1.2,0.3), new THREE.MeshPhongMaterial({color:0xffcc00})); leftArm.position.set(-0.65,1.7,0);
+        const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.3,1.2,0.3), new THREE.MeshPhongMaterial({color:0xffcc00})); leftArm.position.set(-0.65,1.7,0);
     const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.3,1.2,0.3), new THREE.MeshPhongMaterial({color:0xffcc00})); rightArm.position.set(0.65,1.7,0);
     npc.add(leftArm); npc.add(rightArm);
     npc.position.set(Math.random()*20-10,1.5,Math.random()*20-10);
     scene.add(npc);
-    npcs.push({group:npc, direction:new THREE.Vector3(Math.random()-0.5,0,Math.random()-0.5).normalize(), chatTimer:0});
+    npcs.push({group:npc, direction:new THREE.Vector3(Math.random()-0.5,0,Math.random()-0.5).normalize(), chatTimer:0, alive:true});
 }
 
 // ---------------- NPC Movement ----------------
 function updateNPCs(){
     npcs.forEach(npc=>{
+        if(!npc.alive) return;
         npc.group.position.addScaledVector(npc.direction,0.02);
         if(Math.random()<0.01) npc.direction.set(Math.random()-0.5,0,Math.random()-0.5).normalize();
         if(npc.chatTimer>0) npc.chatTimer--;
+    });
+}
+
+// ---------------- Shooting ----------------
+function shootBullet(){
+    const bullet = new THREE.Mesh(new THREE.SphereGeometry(0.1,8,8), new THREE.MeshPhongMaterial({color:0xff0000}));
+    const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
+    bullet.position.copy(player.position).add(new THREE.Vector3(0,1.5,0)).add(dir.clone().multiplyScalar(1));
+    bullets.push({mesh:bullet, dir});
+    scene.add(bullet);
+}
+
+// Check bullet collisions
+function updateBullets(){
+    bullets.forEach((b,i)=>{
+        b.mesh.position.addScaledVector(b.dir, bulletSpeed);
+        npcs.forEach(npc=>{
+            if(!npc.alive) return;
+            const d = npc.group.position.distanceTo(b.mesh.position);
+            if(d<1){
+                // NPC hit, "kill" and respawn after 3 seconds
+                scene.remove(npc.group);
+                npc.alive=false;
+                setTimeout(()=>{
+                    npc.group.position.set(Math.random()*20-10,1.5,Math.random()*20-10);
+                    scene.add(npc.group);
+                    npc.alive=true;
+                },3000);
+            }
+        });
+        // Remove bullet if far
+        if(b.mesh.position.distanceTo(player.position) > 50){
+            scene.remove(b.mesh);
+            bullets.splice(i,1);
+        }
     });
 }
 
@@ -184,6 +227,7 @@ function npcTalk(npc, phrase){
 function getClosestNPC(){
     let closest=null, minDist=Infinity;
     npcs.forEach(npc=>{
+        if(!npc.alive) return;
         const d = npc.group.position.clone().sub(player.position).length();
         if(d<minDist){ minDist=d; closest=npc; }
     });
@@ -191,15 +235,10 @@ function getClosestNPC(){
 }
 
 // ---------------- AI Responses ----------------
-const fallbackReplies = [
-"lol ok","I dunno...","hmm interesting","really?","haha!","what?","sure!","omg","yes","no way","bruh","ok then","that’s crazy","cool","yep","maybe","wait what?","what do you mean?","nice","oh","wow","interesting","ikr","lmao","haha lol","sure sure","alright","uh huh","got it","yup","oof","nope","indeed","wowow","whoa","okok","ohhh","ahah","yeah yeah","aye","nah","ahh","hahaha","hehehe","wtf","omg omg","uhh","huh","hmmm","gotcha","ayyyy","bruh moment","lolol","yea","mhmm","aha","gotcha gotcha","okie","okie dokie","yep yep","nooo","yesss","yo","yooo","hmm hmm","mhmm mhmm","yea yea","hahaha lol","lol yeah"
-];
-
+const fallbackReplies = ["lol ok","I dunno...","hmm interesting","really?","haha!","what?","sure!","omg","yes","no way","bruh","ok then"];
 async function npcAIResponseAPI(playerText){
-    // Replace with backend API call for OpenAI if possible
     return fallbackReplies[Math.floor(Math.random()*fallbackReplies.length)];
 }
-
 async function playerChatAIResponse(text){
     const npc = getClosestNPC();
     if(npc && npc.chatTimer===0){
@@ -221,20 +260,12 @@ function animate(){
         const camRight = new THREE.Vector3(); camRight.crossVectors(camFwd,new THREE.Vector3(0,1,0)).normalize();
         moveVec.addScaledVector(camFwd,-dir.z); moveVec.addScaledVector(camRight,dir.x);
     } else { moveVec.set(dir.x,0,dir.z); }
-
-    if(moveVec.length()>0){
-        player.position.addScaledVector(moveVec,speed);
-        player.rotation.y = Math.atan2(moveVec.x, moveVec.z);
-    }
+    if(moveVec.length()>0){ player.position.addScaledVector(moveVec,speed); player.rotation.y = Math.atan2(moveVec.x, moveVec.z); }
 
     // Arm & leg swing
-    if(move.forward||move.backward){
-        armSwingAngle+=0.1;
-        leftArm.rotation.x=Math.sin(armSwingAngle)*0.5;
-        rightArm.rotation.x=-Math.sin(armSwingAngle)*0.5;
-        leftLeg.rotation.x=-Math.sin(armSwingAngle)*0.5;
-        rightLeg.rotation.x=Math.sin(armSwingAngle)*0.5;
-    } else { leftArm.rotation.x*=0.9; rightArm.rotation.x*=0.9; leftLeg.rotation.x*=0.9; rightLeg.rotation.x*=0.9; }
+    if(move.forward||move.backward){ armSwingAngle+=0.1; leftArm.rotation.x=Math.sin(armSwingAngle)*0.5; rightArm.rotation.x=-Math.sin(armSwingAngle)*0.5;
+        leftLeg.rotation.x=-Math.sin(armSwingAngle)*0.5; rightLeg.rotation.x=Math.sin(armSwingAngle)*0.5; } 
+    else { leftArm.rotation.x*=0.9; rightArm.rotation.x*=0.9; leftLeg.rotation.x*=0.9; rightLeg.rotation.x*=0.9; }
 
     // Gravity
     velocity.y -= gravity; let nextY = player.position.y + velocity.y;
@@ -247,7 +278,8 @@ function animate(){
     camera.position.copy(player.position).add(offset.clone().applyMatrix4(rotMatrix));
     camera.lookAt(player.position.clone().add(new THREE.Vector3(0,1.5,0)));
 
-    updateChat(); updateEmotes(); updateNPCs();
+    // Update
+    updateChat(); updateEmotes(); updateNPCs(); updateBullets();
     renderer.render(scene,camera);
 }
 animate();

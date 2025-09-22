@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Noob Baseplate with AI NPCs</title>
+<style>
+body { margin:0; overflow:hidden; background:#88c0f2; }
+canvas { display:block; }
+#info { position:absolute; top:10px; left:10px; color:white; font-family:Arial; }
+#chatInput { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); display:none; width:200px; font-size:16px; padding:5px; }
+</style>
+</head>
+<body>
+<div id="info">Shift Lock: <span id="shiftStatus">OFF</span></div>
+<input type="text" id="chatInput" placeholder="Type message...">
+
+<!-- Three.js -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+
+<script>
+// --- Scene Setup ---
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x88c0f2);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Lights
+scene.add(new THREE.AmbientLight(0xffffff,0.6));
+const light = new THREE.DirectionalLight(0xffffff,0.8);
+light.position.set(10,20,10); scene.add(light);
+
+// Baseplate
+const base = new THREE.Mesh(new THREE.BoxGeometry(50,1,50), new THREE.MeshPhongMaterial({color:0x2ecc71}));
+base.position.y=0; scene.add(base);
+
+// --- Player Noob ---
+const player = new THREE.Group();
+const head = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshPhongMaterial({color:0xffcc00}));
+head.position.y=2.5; player.add(head);
+const torso = new THREE.Mesh(new THREE.BoxGeometry(1,1.5,0.5), new THREE.MeshPhongMaterial({color:0x0000ff}));
+torso.position.y=1.25; player.add(torso);
+const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5,1,0.5), new THREE.MeshPhongMaterial({color:0x00ff00}));
+leftLeg.position.set(-0.25,0.5,0);
+const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5,1,0.5), new THREE.MeshPhongMaterial({color:0x00ff00}));
+rightLeg.position.set(0.25,0.5,0);
+player.add(leftLeg); player.add(rightLeg);
+const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.3,1.2,0.3), new THREE.MeshPhongMaterial({color:0xffcc00}));
+leftArm.position.set(-0.65,1.7,0);
+const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.3,1.2,0.3), new THREE.MeshPhongMaterial({color:0xffcc00}));
+rightArm.position.set(0.65,1.7,0);
+player.add(leftArm); player.add(rightArm);
+player.position.set(0,1.5,0); scene.add(player);
+
+// --- Variables ---
+let velocity = new THREE.Vector3();
+let canJump=false; 
+let shiftLock=false;
+let move={forward:0,backward:0,left:0,right:0};
+let mouseDown=false; 
+let cameraAngle={x:0,y:0};
+const speed=0.1, gravity=0.02;
+let armSwingAngle=0;
+let chatMessages=[];
+let currentEmote=null;
+let chatOpen=false;
+
+// --- Camera Control ---
+document.addEventListener("mousedown", e=>{if(e.button===2) mouseDown=true;});
+document.addEventListener("mouseup", e=>{if(e.button===2) mouseDown=false;});
+document.addEventListener("mousemove", e=>{
+    if(mouseDown && !chatOpen){
+        cameraAngle.y -= e.movementX*0.002;
+        cameraAngle.x -= e.movementY*0.002;
+        cameraAngle.x=Math.max(-Math.PI/2, Math.min(Math.PI/2,cameraAngle.x));
+    }
+});
+
+// --- Keyboard & Chat ---
+const chatInput = document.getElementById("chatInput");
+document.addEventListener("keydown", async e=>{
+    if(chatOpen){
+        if(e.key==="Enter"){
+            const text = chatInput.value.trim();
+            if(text!==""){
+                addChatMessage("You: "+text);
+                playerChatAIResponse(text); // NPC responds via API
+            }
+            chatInput.value=""; chatInput.style.display="none"; chatOpen=false;
+        }
+        return;
+    }
+    if(e.key==="Shift") shiftLock=!shiftLock; document.getElementById("shiftStatus").textContent = shiftLock?"ON":"OFF";
+    if(e.code==="Space" && canJump){ velocity.y=0.3; canJump=false; }
+    if(e.key.toLowerCase()==="w") move.forward=1;
+    if(e.key.toLowerCase()==="s") move.backward=1;
+    if(e.key.toLowerCase()==="a") move.left=1;
+    if(e.key.toLowerCase()==="d") move.right=1;
+    if(e.key==="1") currentEmote="wave"; 
+    if(e.key==="2") currentEmote="dance";
+    if(e.key==="/"){ chatInput.style.display="block"; chatInput.focus(); chatOpen=true; e.preventDefault(); }
+});
+document.addEventListener("keyup", e=>{
+    if(e.key.toLowerCase()==="w") move.forward=0;
+    if(e.key.toLowerCase()==="s") move.backward=0;
+    if(e.key.toLowerCase()==="a") move.left=0;
+    if(e.key.toLowerCase()==="d") move.right=0;
+});
+
+// --- Chat Functions ---
+function addChatMessage(text){
+    const div = document.createElement("div");
+    div.style.position="absolute";
+    div.style.color="white";
+    div.style.fontFamily="Arial";
+    div.textContent = text;
+    document.body.appendChild(div);
+    chatMessages.push({div, life:200});
+}
+function updateChat(){
+    chatMessages.forEach((msg,i)=>{
+        msg.life--;
+        msg.div.style.left=(window.innerWidth/2-50)+"px";
+        msg.div.style.top=(window.innerHeight/2 - 100 - i*20)+"px";
+        if(msg.life<=0){ msg.div.remove(); chatMessages.splice(i,1); }
+    });
+}
+
+// --- Emotes ---
+document.addEventListener("keydown", e=>{
+    if(chatOpen) return;
+    if(e.key==="1") currentEmote="wave";
+    if(e.key==="2") currentEmote="dance";
+    if(e.key==="0") currentEmote=null;
+});
+function updateEmotes(){
+    if(move.forward || move.backward || move.left || move.right){ currentEmote=null; }
+    const t = Date.now()*0.005;
+    if(currentEmote==="wave"){
+        leftArm.rotation.x = Math.sin(t)*0.8;
+        rightArm.rotation.x = -Math.sin(t)*0.8;
+    } else if(currentEmote==="dance"){
+        leftLeg.rotation.x = Math.sin(t)*0.5;
+        rightLeg.rotation.x = -Math.sin(t)*0.5;
+        leftArm.rotation.x = -Math.sin(t)*0.5;
+        rightArm.rotation.x = Math.sin(t)*0.5;
+        torso.rotation.y = Math.sin(t)*0.3;
+        player.rotation.y += 0.01;
+    } else {
+        leftArm.rotation.x *= 0.9;
+        rightArm.rotation.x *= 0.9;
+        leftLeg.rotation.x *= 0.9;
+        rightLeg.rotation.x *= 0.9;
+        torso.rotation.y *= 0.9;
+    }
+}
+
+// --- NPC Setup ---
+const npcCount = 3;
+const npcs = [];
+for(let i=0;i<npcCount;i++){
+    const npc = new THREE.Group();
+    const head = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshPhongMaterial({color:0xffcc00}));
+    head.position.y=2.5; npc.add(head);
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(1,1.5,0.5), new THREE.MeshPhongMaterial({color:0x0000ff}));
+    torso.position.y=1.25; npc.add(torso);
+    const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5,1,0.5), new THREE.MeshPhongMaterial({color:0x00ff00}));
+    leftLeg.position.set(-0.25,0.5,0);
+    const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.5,1,0.5), new THREE.MeshPhongMaterial({color:0x00ff00}));
+    rightLeg.position.set(0.25,0.5,0);
+    npc.add(leftLeg); npc.add(rightLeg);
+    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.3,1.2,0.3), new THREE.MeshPhongMaterial({color:0xffcc00}));
+    leftArm.position.set(-0.65,1.7,0);
+    const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.3,1.2,0.3), new THREE.MeshPhongMaterial({color:0xffcc00}));
+    rightArm.position.set(0.65,1.7,0);
+    npc.add(leftArm); npc.add(rightArm);
+    npc.position.set(Math.random()*20-10,1.5,Math.random()*20-10);
+    scene.add(npc);
+    npcs.push({group:npc, direction:new THREE.Vector3(Math.random()-0.5,0,Math.random()-0.5).normalize(), chatTimer:0});
+}
+
+// --- NPC Movement ---
+function updateNPCs(){
+    npcs.forEach(npc=>{
+        npc.group.position.addScaledVector(npc.direction,0.02);
+        if(Math.random()<0.01) npc.direction.set(Math.random()-0.5,0,Math.random()-0.5).normalize();
+        if(npc.chatTimer>0) npc.chatTimer--;
+    });
+}
+
+// --- NPC Talk Function ---
+function npcTalk(npc, phrase){
+    addChatMessage("Noob: "+phrase);
+    npc.chatTimer = 200;
+}
+
+// --- Helper: Closest NPC ---
+function getClosestNPC(){
+    let closest=null, minDist=Infinity;
+    npcs.forEach(npc=>{
+        const d = npc.group.position.clone().sub(player.position).length();
+        if(d<minDist){ minDist=d; closest=npc; }
+    });
+    return closest;
+}
+
+// --- AI API Call ---
+async function npcAIResponseAPI(playerText){
+    try {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json",
+                "Authorization":"Bearer YOUR_API_KEY" // <- Replace
+            },
+            body: JSON.stringify({
+                model:"gpt-3.5-turbo",
+                messages:[{role:"user", content:playerText}],
+                max_tokens:20
+            })
+        });
+        const data = await response.json();
+        return data.choices[0].message.content.trim();
+    } catch(e){
+        return "Error generating response.";
+    }
+}
+
+// --- Player chat triggers AI ---
+async function playerChatAIResponse(text){
+    const npc = getClosestNPC();
+    if(npc && npc.chatTimer===0){
+        const reply = await npcAIResponseAPI(text);
+        npcTalk(npc, reply);
+    }
+}
+
+// --- Animate ---
+function animate(){
+    requestAnimationFrame(animate);
+
+    // Movement
+    let dir = new THREE.Vector3(move.right-move.left,0,move.backward-move.forward);
+    if(dir.length()>0) dir.normalize();
+    let moveVec = new THREE.Vector3();
+    if(!shiftLock){
+        const camFwd = new THREE.Vector3(); camera.getWorldDirection(camFwd); camFwd.y=0; camFwd.normalize();
+        const camRight = new THREE.Vector3(); camRight.crossVectors(camFwd,new THREE.Vector3(0,1,0)).normalize();
+        moveVec.addScaledVector(camFwd,-dir.z); moveVec.addScaledVector(camRight,dir.x);
+    } else { moveVec.set(dir.x,0,dir.z); }
+
+    if(moveVec.length()>0){
+        player.position.addScaledVector(moveVec,speed);
+        player.rotation.y = Math.atan2(moveVec.x, moveVec.z);
+    }
+
+    // Arm & leg animation
+    if(move.forward||move.backward){
+        armSwingAngle+=0.1;
+        leftArm.rotation.x=Math.sin(armSwingAngle)*0.5;
+        rightArm.rotation.x=-Math.sin(armSwingAngle)*0.5;
+        leftLeg.rotation.x=-Math.sin(armSwingAngle)*0.5;
+        rightLeg.rotation.x=Math.sin(armSwingAngle)*0.5;
+    } else { leftArm.rotation.x*=0.9; rightArm.rotation.x*=0.9; leftLeg.rotation.x*=0.9; rightLeg.rotation.x*=0.9; }
+
+    // Gravity & floor
+    velocity.y -= gravity; let nextY = player.position.y + velocity.y;
+    if(nextY<1.5){ nextY=1.5; velocity.y=0; canJump=true; }
+    player.position.y = nextY;
+
+    // Camera
+    const offset=new THREE.Vector3(0,5,12);
+    const rotMatrix=new THREE.Matrix4().makeRotationY(cameraAngle.y);
+    camera.position.copy(player.position).add(offset.clone().applyMatrix4(rotMatrix));
+    camera.lookAt(player.position.clone().add(new THREE.Vector3(0,1.5,0)));
+
+    updateChat(); updateEmotes(); updateNPCs();
+    renderer.render(scene,camera);
+}
+animate();
+
+// Prevent right-click
+window.addEventListener("contextmenu", e=>e.preventDefault());
+window.addEventListener("resize", ()=>{
+    camera.aspect=window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth,window.innerHeight);
+});
+</script>
+</body>
+</html>
